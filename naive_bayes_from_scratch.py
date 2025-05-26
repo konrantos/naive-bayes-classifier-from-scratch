@@ -37,7 +37,6 @@ def load_dataset(filename):
 
     return features_list, data_list
 
-
 # Actually load the Iris data -------------------------------------------------
 features_list, data_list = load_dataset("iris.csv")
 
@@ -76,7 +75,10 @@ def feature_info(features_list, data_list):
 
         # Handle categorical (discrete) features and the class label
         if feature["type"] in ("D", "class"):
-            new_feat["values"] = list({row[i] for row in data_list})
+            values = set()
+            for row in data_list:
+                values.add(row[i])
+            new_feat["values"] = list(values)
         # Handle continuous features
         elif feature["type"] == "C":
             numbers = [float(row[i]) for row in data_list]
@@ -85,7 +87,6 @@ def feature_info(features_list, data_list):
         features_info_list.append(new_feat)
 
     return features_info_list
-
 
 features_info_list = feature_info(features_list, training_set)
 
@@ -113,7 +114,6 @@ def a_priori(features_info_list, data_list):
         out.append({"class": cl, "probability": counts[cl] / total})
     return out
 
-
 a_priori_prob_list = a_priori(features_info_list, training_set)
 
 print("\nA priori class probabilities:")
@@ -130,7 +130,7 @@ def discrete_with_smoothing(features_info_list, data_list):
     discrete_probs_list = []
 
     class_index = len(features_info_list) - 1
-    class_values = {row[class_index] for row in data_list}
+    class_values = features_info_list[class_index]["values"]
 
     # Pre-compute class counts for denominators
     class_counts = {c: 0 for c in class_values}
@@ -148,10 +148,9 @@ def discrete_with_smoothing(features_info_list, data_list):
         for row in data_list:
             val = row[i]
             cls = row[class_index]
-            counts.setdefault(val, {c: 0 for c in class_values})
+            if val not in counts:
+                counts[val] = {c: 0 for c in class_values}
             counts[val][cls] += 1
-            if counts[val][cls] == 0:
-                has_zero = True
 
         # Save raw counts (handy for debugging)
         for val in counts:
@@ -164,29 +163,37 @@ def discrete_with_smoothing(features_info_list, data_list):
                         "count": counts[val][cls],
                     }
                 )
-
-        # Convert to probabilities (additive smoothing if any 0 appears)
-        k = len(counts)  # Number of possible values
-        p = 1 / k        # Prior probability under a uniform assumption
-        a = 3            # Strength of the prior (hyper-parameter)
-        for val in counts:
-            for cls in class_values:
-                if has_zero:
+                if counts[val][cls] == 0:
+                    has_zero = True
+                    
+        if has_zero:
+            a = len(counts)
+            p = 1 / a
+            for val in counts:
+                for cls in class_values:
                     prob = (counts[val][cls] + a * p) / (class_counts[cls] + a)
-                else:
+                    discrete_probs_list.append(
+                        {
+                            "feature": feature["name"],
+                            "value": val,
+                            "class": cls,
+                            "probability": prob,
+                        }
+                    )
+        else:
+            for val in counts:
+                for cls in class_values:
                     prob = counts[val][cls] / class_counts[cls]
-
-                discrete_probs_list.append(
-                    {
-                        "feature": feature["name"],
-                        "value": val,
-                        "class": cls,
-                        "probability": prob,
-                    }
-                )
+                    discrete_probs_list.append(
+                        {
+                            "feature": feature["name"],
+                            "value": val,
+                            "class": cls,
+                            "probability": prob,
+                        }
+                    )
 
     return discrete_count_list, discrete_probs_list
-
 
 discrete_count_list, discrete_probs_list = discrete_with_smoothing(
     features_info_list, training_set
@@ -207,7 +214,7 @@ def continuous_with_gaussian(features_info_list, data_list):
     """Fit mean/variance per class for every continuous feature."""
     gaussian_params_list = []
     class_index = len(features_info_list) - 1
-    class_values = {row[class_index] for row in data_list}
+    class_values = features_info_list[class_index]["values"]
 
     for i, feature in enumerate(features_info_list[:-1]):
         # Skip discrete features
@@ -229,7 +236,6 @@ def continuous_with_gaussian(features_info_list, data_list):
             )
 
     return gaussian_params_list
-
 
 gaussian_params_list = continuous_with_gaussian(features_info_list, training_set)
 
@@ -312,7 +318,6 @@ def evaluate(
 
     accuracy = correct / total
     print(f"\nTest set accuracy: {accuracy:.2%}")
-
 
 # Evaluate once ---------------------------------------------------------------
 evaluate(
@@ -398,7 +403,6 @@ def predict_class(
     print("\nPosterior probabilities:")
     for c in class_values:
         print(f"{c}: {class_scores[c]}%")
-
 
 # Main interactive loop -------------------------------------------------------
 while True:
