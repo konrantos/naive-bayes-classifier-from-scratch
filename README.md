@@ -1,5 +1,7 @@
 # Naive Bayes Classifier — From Scratch
 
+> Course project for **Machine Learning** (8th semester) — Department of Informatics and Telecommunications, University of Ioannina.
+
 This project implements a full Naive Bayes Classifier (NBC) **from scratch** in Python, without using external libraries such as `scikit-learn`. The implementation is designed to demonstrate how NBC works under the hood, including both **discrete** and **continuous** features.
 
 ## Key Features
